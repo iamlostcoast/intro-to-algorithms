@@ -148,3 +148,59 @@ def lowest_post_order(S, root, po):
             open_list.append(current)
             open_list += check_nodes
     return lowest_po
+
+def highest_post_order(S, root, po):
+    highest_po = {node: None for node in S.keys()}
+    numbered_nodes = []
+    open_list = [root]
+    while len(open_list) > 0:
+        current = open_list.pop()
+        check_nodes = S[current].keys()
+        non_parent_nodes = S[current].keys()
+        for node in S[current].keys():
+            if S[current][node] == 'red':
+                check_nodes.remove(node)
+            elif node in numbered_nodes:
+                check_nodes.remove(node)
+            elif node in open_list:
+                non_parent_nodes.remove(node)
+                check_nodes.remove(node)
+            else:
+                continue    
+        if len(check_nodes) == 0:
+            # now we need to find all the children and red nodes
+            # connection to this node
+            children = []
+            c_open_list = [current]
+            while len(c_open_list) > 0:
+                c_current = c_open_list.pop()
+                c_check_nodes = S[c_current].keys()
+                for node in S[c_current].keys():
+                    if S[c_current][node] == 'red':
+                        c_check_nodes.remove(node)
+                    elif node in open_list:
+                        c_check_nodes.remove(node)
+                    elif node in c_open_list:
+                        c_check_nodes.remove(node)
+                    elif node in children:
+                        c_check_nodes.remove(node)
+                if len(c_check_nodes) == 0:
+                    children.append(c_current)
+                else:
+                    c_open_list.append(c_current)
+                    c_open_list += c_check_nodes
+            # now we need to add red connections
+            for node, connection in S[c_current].items():
+                if connection == 'red':
+                    children.append(node)
+            # with the children, now we need to find the min value of po for them
+            po_values = [po[node] for node in children]
+            for child in children:
+                if highest_po[child]:
+                    po_values.append(highest_po[child])
+            highest_po[current] = max(po_values)
+            numbered_nodes.append(current)
+        else:
+            open_list.append(current)
+            open_list += check_nodes
+    return highest_po
