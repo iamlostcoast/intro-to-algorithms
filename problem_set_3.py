@@ -59,10 +59,10 @@ def post_order(S, root):
             open_list += check_nodes
     return po
 
-def number_of_descendents(S, root):
+def number_of_descendants(S, root):
     open_list = [root]
     #parent = None
-    descendents = {key: 0 for key in S.keys()}
+    descendants = {key: 0 for key in S.keys()}
     numbered_nodes = []
     while len(open_list) > 0:
         # We'll remove nodes from 'nodes' if:
@@ -80,18 +80,18 @@ def number_of_descendents(S, root):
                 check_nodes.remove(node)
             elif node in numbered_nodes:
                 check_nodes.remove(node)
-                node_value += descendents[node]
+                node_value += descendants[node]
             elif node in open_list:
                 check_nodes.remove(node)
             else:
                 continue
         if len(check_nodes) == 0:
             numbered_nodes.append(current)
-            descendents[current] = node_value + 1
+            descendants[current] = node_value + 1
         else:
             open_list.append(current)
             open_list += check_nodes
-    return descendents
+    return descendants
 
 def lowest_post_order(S, root, po):
     lowest_po = {node: None for node in S.keys()}
@@ -204,3 +204,36 @@ def highest_post_order(S, root, po):
             open_list.append(current)
             open_list += check_nodes
     return highest_po
+
+def bridge_edges(G, root):
+    S = create_rooted_spanning_tree(G, root)
+    po = post_order(S, root)
+    n_d = number_of_descendants(S, root)
+    low_po = lowest_post_order(S, root, po)
+    high_po = highest_post_order(S, root, po)
+    checked_nodes = {node: False for node in S.keys()}
+    open_list = [root]
+    b_edges = []
+    while len(open_list) > 0:
+        current = open_list.pop()
+        parent = None
+        check_nodes = S[current].keys()
+        for node in S[current].keys():
+            if S[current][node] == 'red':
+                check_nodes.remove(node)
+            elif checked_nodes[node]:
+                check_nodes.remove(node)
+            elif node in open_list:
+                parent = node
+                check_nodes.remove(node)
+        # at this point check_nodes should be empty if we're going to check this out
+        # if parent is none, it should be the root which we don't need to check
+        if len(check_nodes) == 0:
+            checked_nodes[current] = True
+            if high_po[current] <= po[current] and low_po[current] > (po[current] - n_d[current]):
+                if parent is not None:
+                    b_edges.append((parent, current))
+        else:
+            open_list.append(current)
+            open_list += check_nodes
+    return b_edges
