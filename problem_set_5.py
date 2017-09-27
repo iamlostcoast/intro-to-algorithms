@@ -172,7 +172,7 @@ def test():
     assert dist[g] == 8 #(a -> d -> e -> g)
     assert dist[b] == 11 #(a -> d -> e -> g -> f -> b)
 
-# test()
+test()
 
 ################
 ## Question 1 ##
@@ -330,3 +330,143 @@ weights = [spiderman_w_hops, goblin_w_hops, wolverine_w_hops, prof_w_hops, capta
 
 count = count_diff(hops, weights)
 print count
+
+
+
+################
+## Question 3 ##
+################
+
+#
+# Another way of thinking of a path in the Kevin Bacon game
+# is not about finding *short* paths, but by finding paths
+# that don’t use obscure movies.  We will give you a
+# list of movies along with their obscureness score.
+#
+# For this assignment, we'll approximate obscurity
+# based on the multiplicative inverse of the amount of
+# money the movie made.  Though, its not really important where
+# the obscurity score came from.
+#
+# Use the the imdb-1.tsv and imdb-weights.tsv files to find
+# the obscurity of the “least obscure”
+# path from a given actor to another.
+# The obscurity of a path is the maximum obscurity of
+# any of the movies used along the path.
+#
+# You will have to do the processing in your local environment
+# and then copy in your answer.
+#
+# Hint: A variation of Dijkstra can be used to solve this problem.
+#
+
+def dijkstra_obs(G,v):
+
+    obs_heap = [v]
+    obs_so_far = {v: 0}
+    location_dict = {v: 0}
+
+    final_obs = {}
+    while len(obs_heap) > 0:
+        # get the minimum node/val pair
+        w = obs_heap[0]
+        val = obs_so_far[w]
+
+        # remove the min pair from the location dict
+        del obs_heap[0]
+        del obs_so_far[w]
+        del location_dict[w]
+
+        # set the last element of obs_heap to the first and down heapify
+        if len(obs_heap) > 0:
+            obs_heap.insert(0, obs_heap.pop(-1))
+            location_dict[obs_heap[0]] = 0
+            down_heapify(obs_heap, 0, location_dict, obs_so_far)
+
+        # lock it down!
+        final_obs[w] = val
+
+        for x in G[w]:
+            if x not in final_obs:
+                if x not in obs_heap:
+                    obs_heap.append(x)
+                    # add the new node to the location dictionary
+                    location_dict[x] = len(obs_heap)-1
+                    # and add new new distance to the value dictionary
+                    obs_so_far[x] = max(G[w][x], final_obs[w])
+                    up_heapify(obs_heap, len(obs_heap)-1, location_dict, obs_so_far)
+                # if x IS in the dist so far heap, we want to see if it's value is higher than the current
+                # distance, and if it is update it
+                elif obs_so_far[x] > max(G[w][x], final_obs[w]):
+                    obs_so_far[x] = max(G[w][x], final_obs[w])
+                    up_heapify(obs_heap, location_dict[x], location_dict, obs_so_far)
+    return final_obs
+
+def make_obs_link(G, node1, node2, w):
+    if node1 not in G:
+        G[node1] = {node2: w}
+    elif node1 in G:
+        if node2 in G[node1]:
+            if (G[node1])[node2] > w:
+                (G[node1])[node2] = w
+        else:
+            (G[node1])[node2] = w
+    if node2 not in G:
+        G[node2] = {node1: w}
+    elif node2 in G:
+        if node1 in G[node2]:
+            if (G[node2])[node1] > w:
+                (G[node2])[node1] = w
+        else:
+            (G[node2])[node1] = w
+    return G
+
+def build_obs_graph(actors_file, weights_file):
+    actors_df = pd.read_csv(actors_file, sep='\t', encoding='utf-8')
+    weights_df = pd.read_csv(weights_file, sep='\t', encoding='utf-8')
+    actors_df.columns = ['actor', 'movie', 'year']
+    weights_df.columns = ['movie', 'year', 'weight']
+    df = actors_df.merge(weights_df, on=['movie', 'year'])
+    # now let's make a graph that connects just actors, based on the least obscure
+    # movie they appeared in together
+    G = {}
+    for actor_1 in set(df['actor'].values):
+        actor_1_movies = df.loc[df['actor'] == actor_1, 'movie']
+        shared_actors = df.loc[df['movie'].isin(actor_1_movies), 'actor']
+        shared_weight = df.loc[df['movie'].isin(actor_1_movies), 'weight']
+        for actor_2, w in zip(shared_actors, shared_weight):
+            # so we don't double count
+            if actor_2 > actor_1:
+                G = make_obs_link(G, actor_1, actor_2, w)
+    return G
+
+answer_pairs = {(u'Boone Junior, Mark', u'Del Toro, Benicio'): None,
+          (u'Braine, Richard', u'Coogan, Will'): None,
+          (u'Byrne, Michael (I)', u'Quinn, Al (I)'): None,
+          (u'Cartwright, Veronica', u'Edelstein, Lisa'): None,
+          (u'Curry, Jon (II)', u'Wise, Ray (I)'): None,
+          (u'Di Benedetto, John', u'Hallgrey, Johnathan'): None,
+          (u'Hochendoner, Jeff', u'Cross, Kendall'): None,
+          (u'Izquierdo, Ty', u'Kimball, Donna'): None,
+          (u'Jace, Michael', u'Snell, Don'): None,
+          (u'James, Charity', u'Tuerpe, Paul'): None,
+          (u'Kay, Dominic Scott', u'Cathey, Reg E.'): None,
+          (u'McCabe, Richard', u'Washington, Denzel'): None,
+          (u'Reid, Kevin (I)', u'Affleck, Rab'): None,
+          (u'Reid, R.D.', u'Boston, David (IV)'): None,
+          (u'Restivo, Steve', u'Preston, Carrie (I)'): None,
+          (u'Rodriguez, Ramon (II)', u'Mulrooney, Kelsey'): None,
+          (u'Rooker, Michael (I)', u'Grady, Kevin (I)'): None,
+          (u'Ruscoe, Alan', u'Thornton, Cooper'): None,
+          (u'Sloan, Tina', u'Dever, James D.'): None,
+          (u'Wasserman, Jerry', u'Sizemore, Tom'): None}
+
+answer = {}
+
+graph = build_obs_graph('./imdb_1.tsv', './imdb_weights.tsv')
+
+for actor_pair in answer_pairs.keys():
+    obs_graph = dijkstra_obs(graph, actor_pair[0])
+    answer[actor_pair] = round(obs_graph[actor_pair[1]], 4)
+
+print answer
