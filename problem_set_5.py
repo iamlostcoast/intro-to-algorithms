@@ -172,4 +172,161 @@ def test():
     assert dist[g] == 8 #(a -> d -> e -> g)
     assert dist[b] == 11 #(a -> d -> e -> g -> f -> b)
 
-test()
+# test()
+
+################
+## Question 1 ##
+################
+
+# part 1
+
+# Use your code from earlier to change the Marvel graph to only have characters as nodes.
+# Use 1.0/count as the weight, where count is the number of comic books each character
+# appeared in together
+
+import pandas as pd
+import csv
+
+def make_link_inverse(G, node1, node2):
+    if node1 not in G:
+        G[node1] = {}
+        (G[node1])[node2] = 1
+    elif node1 in G:
+        if node2 in G[node1]:
+            (G[node1])[node2] = 1/((G[node1])[node2]**-1 + 1)
+        else:
+            (G[node1])[node2] = 1
+    if node2 not in G:
+        G[node2] = {}
+        (G[node2])[node1] = 1
+    elif node2 in G:
+        if node1 in G[node2]:
+            (G[node2])[node1] = 1/((G[node2])[node1]**-1 + 1)
+        else:
+            (G[node2])[node1] = 1
+    return G
+
+
+def read_comic_graph(filename):
+    # Read an undirected graph in CSV format. Each line is an edge
+    tsv = csv.reader(open(filename), delimiter='\t')
+    G = {}
+    char_df = pd.read_csv(filename, sep='\t', names=['char', 'comic'])
+
+    for char_1 in set(char_df['char'].values):
+        char_1_comics = char_df.loc[char_df['char'] == char_1, 'comic']
+        char_1_shared_chars = char_df.loc[char_df['comic'].isin(char_1_comics), 'char']
+        for char_2 in char_1_shared_chars:
+            # so we don't double count
+            if char_2 > char_1:
+                make_link_inverse(G, char_1, char_2)
+    return G
+
+graph = read_comic_graph('super_hero.tsv')
+
+# now we need to find the shortest_weighted and shortest_hops for these 5 characters:
+
+# 'SPIDER-MAN/PETER PAR'
+# 'GREEN GOBLIN/NORMAN'
+# 'WOLVERINE/LOGAN '
+# 'PROFESSOR X/CHARLES '
+# 'CAPTAIN AMERICA'
+
+# and for each of those characters count up how many times the shortest weighted path
+# is different than the shortest hop path
+
+# we'll modify  the djikstra algorithm from earlier to get the shortest weighted paths,
+# and the number of hops it took to get that path.
+# we'll also use a new path function to get the shortest hop path dictionary:
+
+def paths(G, v):
+    distance_dict = {}
+    open_list = [v]
+    distance_dict[v] = 0
+    while len(open_list) > 0:
+        current = open_list[0]
+        del open_list[0]
+        for neighbor in G[current].keys():
+            if neighbor not in distance_dict:
+                distance_dict[neighbor] = distance_dict[current] + 1
+                open_list.append(neighbor)
+    return distance_dict
+
+def dijkstra_plus_hops(G,v):
+
+    dist_so_far_heap = [v]
+    dist_so_far_values = {v: 0}
+    hops_so_far = {v: 0}
+
+    location_dict = {v: 0}
+
+    final_hops = {}
+    final_dist = {}
+    # we'll just treat the dist_so_far_heap as an open list
+    while len(dist_so_far_heap) > 0:
+        # get the minimum node/val pair
+        w = dist_so_far_heap[0]
+        val = dist_so_far_values[w]
+        hops_val = hops_so_far[w]
+        # remove the min pair from the location dict
+        del dist_so_far_heap[0]
+        del dist_so_far_values[w]
+        del hops_so_far[w]
+        del location_dict[w]
+
+        # set the last element of dist_so_far_heap to the first and down heapify
+        if len(dist_so_far_heap) > 0:
+            dist_so_far_heap.insert(0, dist_so_far_heap.pop(-1))
+            location_dict[dist_so_far_heap[0]] = 0
+            down_heapify(dist_so_far_heap, 0, location_dict, dist_so_far_values)
+
+        # lock it down!
+        final_hops[w] = hops_val
+        final_dist[w] = val
+
+        for x in G[w]:
+            if x not in final_dist:
+                if x not in dist_so_far_heap:
+                    dist_so_far_heap.append(x)
+                    # add the new node to the location dictionary
+                    location_dict[x] = len(dist_so_far_heap)-1
+                    # and add new new distance to the value dictionary
+                    dist_so_far_values[x] = final_dist[w] + G[w][x]
+                    hops_so_far[x] = final_hops[w] + 1
+                    up_heapify(dist_so_far_heap, len(dist_so_far_heap)-1, location_dict, dist_so_far_values)
+                # if x IS in the dist so far heap, we want to see if it's value is higher than the current
+                # distance, and if it is update it
+                elif dist_so_far_values[x] > final_dist[w] + G[w][x]:
+                    dist_so_far_values[x] = final_dist[w] + G[w][x]
+                    hops_so_far[x] = final_hops[w] + 1
+                    up_heapify(dist_so_far_heap, location_dict[x], location_dict, dist_so_far_values)
+    return final_dist, final_hops
+
+spiderman_hops = paths(graph, 'SPIDER-MAN/PETER PAR')
+spiderman_weighted, spiderman_w_hops = dijkstra_plus_hops(graph, 'SPIDER-MAN/PETER PAR')
+
+goblin_hops = paths(graph, 'GREEN GOBLIN/NORMAN ')
+goblin_weighted, goblin_w_hops = dijkstra_plus_hops(graph, 'GREEN GOBLIN/NORMAN ')
+
+wolverine_hops = paths(graph, 'WOLVERINE/LOGAN ')
+wolverine_weighted, wolverine_w_hops = dijkstra_plus_hops(graph, 'WOLVERINE/LOGAN ')
+
+prof_hops = paths(graph, 'PROFESSOR X/CHARLES ')
+prof_weighted, prof_w_hops = dijkstra_plus_hops(graph, 'PROFESSOR X/CHARLES ')
+
+captain_hops = paths(graph, 'CAPTAIN AMERICA')
+captain_weighted, captain_w_hops = dijkstra_plus_hops(graph, 'CAPTAIN AMERICA')
+
+def count_diff(hops_dicts, weights_dicts):
+    diff_count = 0
+    for (hops, weights) in zip(hops_dicts, weights_dicts):
+        for char in hops.keys():
+            if hops[char] != weights[char]:
+                diff_count += 1
+    return diff_count
+
+hops = [spiderman_hops, goblin_hops, wolverine_hops, prof_hops, captain_hops]
+weights = [spiderman_w_hops, goblin_w_hops, wolverine_w_hops, prof_w_hops, captain_w_hops]
+
+count = count_diff(hops, weights)
+print count
